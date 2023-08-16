@@ -204,6 +204,7 @@ string solve(v_int &nums, int goal = 24) {
 		string ans;
 		for (int i = 0; i < (int)nums.size(); ++i) {
 			v_int tmp;
+			if (nums[i] < 0) return "N/A";
 			for (int j = 0; j < (int)nums.size(); ++j) {
 				if (i == j) continue;
 				tmp.push_back(nums[j]);
