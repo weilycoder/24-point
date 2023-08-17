@@ -1,10 +1,14 @@
-// twenty-four-point
-#include <cstring>
 #include <iostream>
+#include <cstring>
+#include <stack>
 #include <vector>
 using namespace std;
 
+typedef stack<int> st_int;
 typedef vector<int> v_int;
+
+const int goal = 24;
+const char ops[4] = {'+', '-', '*', '/'};
 
 short STATE = 0;
 
@@ -26,6 +30,12 @@ inline int safe_mul(int a, int b) {
 	return x;
 }
 
+inline int safe_div(int a, int b) {
+	if (b == 0) return -2;
+	if (a % b) return -1;
+	return a / b;
+}
+
 int factorial(int x) {
 	if (STATE & 1) return -5;
 	if (x < 0) return -1;
@@ -36,21 +46,6 @@ int factorial(int x) {
 		if (ans > INT_MAX) return -2;
 	}
 	return ans;
-}
-
-int unfactorial(int x) {
-	if (STATE & 1) return -5;
-	if (x < 1) return -1;
-	int i = 1;
-	for (; !(x % i); ++i) x /= i;
-	if (x == 1) return i - 1;
-	else return -1;
-}
-
-int square(int x) {
-	if (STATE & 2) return -5;
-	if (x < 65535) return x * x;
-	return -1;
 }
 
 int isqrt_newton(int n) {
@@ -69,18 +64,77 @@ int isqrt_newton(int n) {
 	return x;
 }
 
-string join(v_int &x) {
-	string ans;
-	for (int i = 0; i < (int)x.size(); ++i)
-		ans.append(to_string(x[i])).append(1, '+');
-	ans.pop_back();
-	return ans;
+char push_op(st_int &st, char op) {
+	if (st.size() < 2) return -1;
+	int a = st.top(), b;
+	st.pop();
+	b = st.top();
+	st.pop();
+	switch (op) {
+		case 0:
+			st.push(safe_add(a, b));
+			break;
+		case 1:
+			st.push(safe_sub(a, b));
+			break;
+		case 2:
+			st.push(safe_mul(a, b));
+			break;
+		case 3:
+			st.push(safe_div(a, b));
+			break;
+		default:
+			return -2;
+	}
+	if (st.top() < 0) return -3;
+	return 0;
+}
+
+string dfs(v_int &data, st_int &st) {
+	if (data.empty() && st.size() == 1 && st.top() == goal) return "";
+	for (int i = 0; i < (int)data.size(); ++i) {
+		if (data[i] < 0 || data[i] > 9) return "N/A";
+		v_int tmp_v;
+		st_int tmp_st = st;
+		tmp_st.push(data[i]);
+		for (int j = 0; j < (int)data.size(); ++j) {
+			if (i == j) continue;
+			tmp_v.push_back(data[j]);
+		}
+		string ans = dfs(tmp_v, tmp_st);
+		if (ans != "N/A") return to_string(data[i]) + ans;
+	}
+	for (int i = 0; i < 4; ++i) {
+		st_int tmp_st = st;
+		if (push_op(tmp_st, i) == 0) {
+			string ans = dfs(data, tmp_st);
+			if (ans != "N/A") return ans.insert(0, 1, ops[i]);
+		}
+	}
+	if (st.size()) {
+		int tmp = factorial(st.top());
+		if (tmp > 0) {
+			st_int tmp_st = st;
+			tmp_st.pop();
+			tmp_st.push(tmp);
+			string ans = dfs(data, tmp_st);
+			if (ans != "N/A") return ans.insert(0, 1, '!');
+		}
+		tmp = isqrt_newton(st.top());
+		if (tmp > 0) {
+			st_int tmp_st = st;
+			tmp_st.pop();
+			tmp_st.push(tmp);
+			string ans = dfs(data, tmp_st);
+			if (ans != "N/A") return ans.insert(0, 1, 's');
+		}
+	}
+	return "N/A";
 }
 
 inline string _bracket(string a) {
 	return "(" + a + ")";
 }
-
 string bracket(string a, string ops) {
 	int flag = 0;
 	for (int i = 0; i < (int)a.length(); ++i) {
@@ -91,7 +145,6 @@ string bracket(string a, string ops) {
 	}
 	return a;
 }
-
 inline string bracket_mul(string a) {
 	return bracket(a, "+-");
 }
@@ -102,129 +155,44 @@ inline string bracket_fac(string a) {
 	return bracket(a, "+-*/!");
 }
 
-string solve(v_int &, int);
-string dfs(v_int &, int, string, int);
-
-string dfs_add(v_int &nums, int x, string t, int goal) {
-    if (x < 0) return "N/A";
-	string ans;
-flag_sqrt_dfs_add:
-	int cx = x;
-	string ct = t;
-flag_fac_dfs_add:
-	ans = solve(nums, safe_sub(goal, x));
-	if (ans != "N/A") return ans + "+" + t;
-	ans = solve(nums, safe_add(goal, x));
-	if (ans != "N/A") return ans + "-" + t;
-	x = factorial(x);
-	if (x > 0) {
-		t = bracket_fac(t) + "!";
-		goto flag_fac_dfs_add;
+void push_op(stack<string> &st, char op) {
+	string a = st.top();
+	st.pop();
+	if (op == '!') {
+		st.push(bracket_fac(a) + "!");
+		return;
+	} else if (op == 's') {
+		st.push("sqrt(" + a + ")");
+		return;
 	}
-	x = cx, t = ct;
-	x = isqrt_newton(x);
-	if (x > 1) {
-		t = "sqrt(" + t + ")";
-		goto flag_sqrt_dfs_add;
+	string b = st.top();
+	st.pop();
+	switch (op) {
+		case '+':
+			st.push(a + "+" + b);
+			break;
+		case '-':
+			st.push(a + "-" + bracket_mul(b));
+			break;
+		case '*':
+			st.push(bracket_mul(a) + "*" + bracket_mul(b));
+			break;
+		case '/':
+			st.push(bracket_mul(a) + "/" + bracket_mul2(b));
+			break;
 	}
-	return "N/A";
 }
 
-string dfs_mul(v_int &nums, int x, string t, int goal) {
-    if (x < 0) return "N/A";
-	string ans;
-flag_sqrt_dfs_add:
-	int cx = x;
-	string ct = t;
-flag_fac_dfs_mul:
-	if (x != 0) {
-		if (goal % x == 0) {
-			ans = solve(nums, goal / x);
-			if (ans != "N/A") return bracket_mul(ans) + "*" + t;
-		}
-		ans = solve(nums, safe_mul(goal, x));
-		if (ans != "N/A") return bracket_mul(ans) + "/" + t;
-		if (goal != 0 && x % goal == 0) {
-			ans = solve(nums, x / goal);
-			if (ans != "N/A") return t + "/" + bracket_mul2(ans);
-		}
-	} else if (goal == 0) {
-		ans = join(nums);
-		return bracket_mul(ans) + "*0";
+string solve(v_int &data) {
+	st_int st;
+	string ans = dfs(data, st);
+	if (ans == "N/A") return ans;
+	stack<string> tmp;
+	for (int i = 0; i < (int)ans.length(); ++i) {
+		if (ans[i] >= '0' && ans[i] <= '9') tmp.push(ans.substr(i, 1));
+		else push_op(tmp, ans[i]);
 	}
-	x = factorial(x);
-	if (x > 0) {
-		t = bracket_fac(t) + "!";
-		goto flag_fac_dfs_mul;
-	}
-	x = cx, t = ct;
-	x = isqrt_newton(x);
-	if (x > 0) {
-		t = "sqrt(" + t + ")";
-		goto flag_sqrt_dfs_add;
-	}
-	return "N/A";
-}
-
-string ddfs(v_int &nums, int x, string t, int goal) {
-	string ans;
-	if (nums.size() < 2) return "N/A";
-	for (int i = 0; i < (int)nums.size(); ++i) {
-		v_int tmp;
-		for (int j = 0; j < (int)nums.size(); ++j) {
-			if (i == j) continue;
-			tmp.push_back(nums[j]);
-		}
-		ans = dfs_mul(tmp, safe_add(x, nums[i]), _bracket(t + "+" + to_string(nums[i])), goal);
-		if (ans != "N/A") return ans;
-		ans = dfs_mul(tmp, safe_sub(x, nums[i]), _bracket(t + "-" + to_string(nums[i])), goal);
-		if (ans != "N/A") return ans;
-		ans = dfs_add(tmp, safe_mul(x, nums[i]), t + "*" + to_string(nums[i]), goal);
-		if (ans != "N/A") return ans;
-	}
-	return "N/A";
-}
-
-string dfs(v_int &nums, int x, string t, int goal) {
-	string ans;
-	ans = dfs_add(nums, x, t, goal);
-	if (ans != "N/A") return ans;
-	ans = dfs_mul(nums, x, t, goal);
-	if (ans != "N/A") return ans;
-	ans = ddfs(nums, x, t, goal);
-	return "N/A";
-}
-
-string solve(v_int &nums, int goal = 24) {
-	if (nums.size() == 0 || goal < 0) return "N/A";
-	if (nums.size() == 1) {
-		if (nums[0] == goal)
-			return to_string(goal);
-	} else {
-		string ans;
-		for (int i = 0; i < (int)nums.size(); ++i) {
-			v_int tmp;
-			if (nums[i] < 0) return "N/A";
-			for (int j = 0; j < (int)nums.size(); ++j) {
-				if (i == j) continue;
-				tmp.push_back(nums[j]);
-			}
-			ans = dfs(tmp, nums[i], to_string(nums[i]), goal);
-			if (ans != "N/A") return ans;
-		}
-	}
-	int uf = unfactorial(goal);
-	if (uf == 1) uf = 0;
-	if (uf > 2 || uf == 0) {
-		string ans = solve(nums, uf);
-		if (ans != "N/A") return bracket_fac(ans) + "!";
-	}
-	int isq = square(goal);
-	if (isq > goal) {
-		string ans = solve(nums, isq);
-		if (ans != "N/A") return "sqrt(" + ans + ")";
-	}
-	return "N/A";
+	return tmp.top();
 }
 
 int read(const char *str) {
@@ -239,7 +207,7 @@ int read(const char *str) {
 
 int main(int argc, char *argv[]) {
 	int t;
-	v_int v;
+	v_int data;
 	for (int i = 1; i < argc; ++i) {
 		if (strcmp(argv[i], "-f") == 0)
 			STATE |= 1;
@@ -250,16 +218,16 @@ int main(int argc, char *argv[]) {
 			for (; j < argc; ++j) {
 				t = read(argv[j]);
 				if (t < 0) break;
-				v.push_back(t);
+				data.push_back(t);
 			}
 			i = j - 1;
 		} else {
 			STATE = 0;
-			v.clear();
+			data.clear();
 			break;
 		}
 	}
-	if (!v.size()) while (cin >> t) v.push_back(t);
-	cout << solve(v);
+	if (!data.size()) while (cin >> t) data.push_back(t);
+	cout << solve(data) << endl;
 	return 0;
 }
