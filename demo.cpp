@@ -40,6 +40,7 @@ inline BigInt safe_div(BigInt a, BigInt b) {
 
 BigInt factorial(BigInt x) {
 	if (STATE & 1) return minusone;
+	if (x.is_zero()) return one;
 	if (x <= two) return minusone;
 	BigInt ans = one;
 	for (BigInt i = x; i > one; i -= one) {
