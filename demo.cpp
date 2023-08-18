@@ -1,75 +1,104 @@
+#include "bigint_dec.h"
 #include <iostream>
-#include <cstring>
 #include <stack>
-#include <vector>
+#define MAX_BIGINT_SIZE 8
 using namespace std;
 
-typedef stack<int> st_int;
-typedef vector<int> v_int;
+typedef stack<BigInt> st_int;
+typedef stack<bool> st_bool;
+typedef stack<string> st_str;
+typedef vector<BigInt> v_int;
 
-const int goal = 24;
-const char ops[4] = {'+', '-', '*', '/'};
+const char ops[8] = {'+', '-', '*', '/', '|', '!', 's'};
 
 short STATE = 0;
+const BigInt zero(0), one(1), minusone(-1), two(2), goal(24);
 
-inline int safe_add(int a, int b) {
-	long long x = (long long)(a) + b;
-	if (x > INT_MAX || x < 0) return -1;
+inline BigInt safe_add(BigInt a, BigInt b) {
+	BigInt x = a + b;
+	if (x.get_size() > MAX_BIGINT_SIZE) return minusone;
 	return x;
 }
 
-inline int safe_sub(int a, int b) {
-	long long x = (long long)(a) - b;
-	if (x > INT_MAX || x < 0) return -1;
+inline BigInt safe_sub(BigInt a, BigInt b) {
+	BigInt x = a - b;
+	if (x < zero) return minusone;
 	return x;
 }
 
-inline int safe_mul(int a, int b) {
-	long long x = (long long)(a) * b;
-	if (x > INT_MAX || x < 0) return -1;
+inline BigInt safe_mul(BigInt a, BigInt b) {
+	BigInt x = a * b;
+	if (x.get_size() > MAX_BIGINT_SIZE) return minusone;
 	return x;
 }
 
-inline int safe_div(int a, int b) {
-	if (b == 0) return -2;
-	if (a % b) return -1;
+inline BigInt safe_div(BigInt a, BigInt b) {
+	if (b.is_zero()) return minusone;
+	if (!(a % b).is_zero()) return minusone;
 	return a / b;
 }
 
-int factorial(int x) {
-	if (STATE & 1) return -5;
-	if (x < 0) return -1;
-	if (x == 1 || x == 2) return -3;
-	long long ans = 1LL;
-	for (int i = 2; i <= x; ++i) {
+BigInt factorial(BigInt x) {
+	if (STATE & 1) return minusone;
+	if (x <= two) return minusone;
+	BigInt ans = one;
+	for (BigInt i = x; i > one; i -= one) {
 		ans *= i;
-		if (ans > INT_MAX) return -2;
+		if (ans.get_size() > MAX_BIGINT_SIZE) return minusone;
 	}
 	return ans;
 }
 
-int isqrt_newton(int n) {
-	if (STATE & 2) return -5;
-	if (n < 0) return -1;
-	if (n < 2) return -2;
-	int x = 1;
+BigInt isqrt_newton(BigInt n) {
+	if (STATE & 2) return minusone;
+	if (n < two) return minusone;
+	BigInt x;
+	x.set_bysize(n.get_size() >> 1);
 	bool decreased = false;
 	for (;;) {
-		int nx = (x + n / x) >> 1;
+		BigInt nx = (x + n / x) /= two;
 		if (x == nx || (nx > x && decreased)) break;
 		decreased = nx < x;
 		x = nx;
 	}
-	if (x * x != n) return -3;
-	return x;
+	if (x * x == n) return x;
+	return minusone;
 }
 
-char push_op(st_int &st, char op) {
+BigInt connect(BigInt a, BigInt b) {
+	BigInt r(a.to_str() + b.to_str());
+	if (r.get_size() > MAX_BIGINT_SIZE) return minusone;
+	return r;
+}
+
+char push_op_1(st_int &st, char op, st_bool &tp) {
+	if (st.empty()) return -1;
+	BigInt a = st.top();
+	st.pop();
+	switch (op) {
+		case 5:
+			st.push(factorial(a));
+			break;
+		case 6:
+			st.push(isqrt_newton(a));
+			break;
+	}
+	tp.pop();
+	tp.push(false);
+	if (st.top() < zero) return -3;
+	return 0;
+}
+
+char push_op_2(st_int &st, char op, st_bool &tp) {
 	if (st.size() < 2) return -1;
-	int a = st.top(), b;
+	BigInt a = st.top(), b;
 	st.pop();
 	b = st.top();
 	st.pop();
+	bool flag = tp.top();
+	tp.pop();
+	flag &= tp.top();
+	tp.pop();
 	switch (op) {
 		case 0:
 			st.push(safe_add(a, b));
@@ -83,58 +112,62 @@ char push_op(st_int &st, char op) {
 		case 3:
 			st.push(safe_div(a, b));
 			break;
+		case 4:
+			if (!(STATE & 4) & flag) st.push(connect(a, b));
+			else return -2;
+			break;
 		default:
 			return -2;
 	}
-	if (st.top() < 0) return -3;
+	tp.push(op == 4);
+	if (st.top() < zero) return -3;
 	return 0;
 }
 
-string dfs(v_int &data, st_int &st) {
-	if (data.empty() && st.size() == 1 && st.top() == goal) return "";
+char push_op(st_int &st, char op, st_bool &tp) {
+	switch (op) {
+		case 5:
+		case 6:
+			return push_op_1(st, op, tp);
+		default:
+			return push_op_2(st, op, tp);
+	}
+}
+
+inline st_str &push(st_str &st, string s) {
+	st.push(s);
+	return st;
+}
+
+st_str dfs(v_int &data, st_int &st, st_bool &tp) {
+	st_str r;
+	if (data.empty() && st.size() == 1 && st.top() == goal) return r;
+	r.push("N/A");
 	for (int i = 0; i < (int)data.size(); ++i) {
-		if (data[i] < 0 || data[i] > 9) return "N/A";
+		if (data[i] < zero) return r;
 		v_int tmp_v;
 		st_int tmp_st = st;
-		tmp_st.push(data[i]);
+		st_bool ttp = tp;
+		tmp_st.push(data[i]), ttp.push(true);
 		for (int j = 0; j < (int)data.size(); ++j) {
 			if (i == j) continue;
 			tmp_v.push_back(data[j]);
 		}
-		string ans = dfs(tmp_v, tmp_st);
-		if (ans != "N/A") return to_string(data[i]) + ans;
+		st_str ans = dfs(tmp_v, tmp_st, ttp);
+		if (ans.empty() || ans.top() != "N/A") return push(ans, data[i].to_str());
 	}
-	for (int i = 0; i < 4; ++i) {
+	for (int i = 0; i < 7; ++i) {
 		st_int tmp_st = st;
-		if (push_op(tmp_st, i) == 0) {
-			string ans = dfs(data, tmp_st);
-			if (ans != "N/A") return ans.insert(0, 1, ops[i]);
+		st_bool ttp = tp;
+		if (push_op(tmp_st, i, ttp) == 0) {
+			st_str ans = dfs(data, tmp_st, ttp);
+			if (ans.empty() || ans.top() != "N/A") return push(ans, string(1, ops[i]));
 		}
 	}
-	if (st.size()) {
-		int tmp = factorial(st.top());
-		if (tmp > 0) {
-			st_int tmp_st = st;
-			tmp_st.pop();
-			tmp_st.push(tmp);
-			string ans = dfs(data, tmp_st);
-			if (ans != "N/A") return ans.insert(0, 1, '!');
-		}
-		tmp = isqrt_newton(st.top());
-		if (tmp > 0) {
-			st_int tmp_st = st;
-			tmp_st.pop();
-			tmp_st.push(tmp);
-			string ans = dfs(data, tmp_st);
-			if (ans != "N/A") return ans.insert(0, 1, 's');
-		}
-	}
-	return "N/A";
+	return r;
 }
 
-inline string _bracket(string a) {
-	return "(" + a + ")";
-}
+inline string _bracket(string a) { return "(" + a + ")"; }
 string bracket(string a, string ops) {
 	int flag = 0;
 	for (int i = 0; i < (int)a.length(); ++i) {
@@ -145,17 +178,11 @@ string bracket(string a, string ops) {
 	}
 	return a;
 }
-inline string bracket_mul(string a) {
-	return bracket(a, "+-");
-}
-inline string bracket_mul2(string a) {
-	return bracket(a, "+-*/");
-}
-inline string bracket_fac(string a) {
-	return bracket(a, "+-*/!");
-}
+inline string bracket_mul(string a) { return bracket(a, "+-"); }
+inline string bracket_mul2(string a) { return bracket(a, "+-*/"); }
+inline string bracket_fac(string a) { return bracket(a, "+-*/!"); }
 
-void push_op(stack<string> &st, char op) {
+void push_op(st_str &st, char op) {
 	string a = st.top();
 	st.pop();
 	if (op == '!') {
@@ -180,45 +207,48 @@ void push_op(stack<string> &st, char op) {
 		case '/':
 			st.push(bracket_mul(a) + "/" + bracket_mul2(b));
 			break;
+		case '|':
+			st.push(a + b);
+			break;
 	}
+}
+
+bool is_int(string str) {
+	for (int i = 0; i < (int)str.length(); ++i)
+		if (str[i] < '0' || str[i] > '9')
+			return false;
+	return true;
 }
 
 string solve(v_int &data) {
 	st_int st;
-	string ans = dfs(data, st);
-	if (ans == "N/A") return ans;
-	stack<string> tmp;
-	for (int i = 0; i < (int)ans.length(); ++i) {
-		if (ans[i] >= '0' && ans[i] <= '9') tmp.push(ans.substr(i, 1));
-		else push_op(tmp, ans[i]);
+	st_bool tp;
+	st_str ans = dfs(data, st, tp);
+	if (ans.size() && ans.top() == "N/A") return "N/A";
+	st_str tmp;
+	BigInt r;
+	for (; ans.size(); ans.pop()) {
+		if (is_int(ans.top())) tmp.push(ans.top());
+		else push_op(tmp, ans.top()[0]);
 	}
 	return tmp.top();
 }
 
-int read(const char *str) {
-	int x = 0;
-	if (str[0] == 0) return -1;
-	for (int i = 0; str[i]; ++i) {
-		if (str[i] >= '0' && str[i] <= '9') x = x * 10 + (str[i] ^ '0');
-		else return -1;
-	}
-	return x;
-}
-
 int main(int argc, char *argv[]) {
-	int t;
+	BigInt t;
 	v_int data;
 	for (int i = 1; i < argc; ++i) {
 		if (strcmp(argv[i], "-f") == 0)
 			STATE |= 1;
 		else if (strcmp(argv[i], "-s") == 0)
 			STATE |= 2;
+		else if (strcmp(argv[i], "-c") == 0)
+			STATE |= 4;
 		else if (strcmp(argv[i], "-d") == 0) {
 			int j = i + 1;
 			for (; j < argc; ++j) {
-				t = read(argv[j]);
-				if (t < 0) break;
-				data.push_back(t);
+				if (is_int(argv[j])) data.push_back(t.from_str(argv[j]));
+				else break;
 			}
 			i = j - 1;
 		} else {
@@ -227,7 +257,10 @@ int main(int argc, char *argv[]) {
 			break;
 		}
 	}
-	if (!data.size()) while (cin >> t) data.push_back(t);
+	if (!data.size()){
+		string s;
+		while (cin >> s && is_int(s)) data.push_back(t.from_str(s));
+	}
 	cout << solve(data) << endl;
 	return 0;
 }
