@@ -68,3 +68,8 @@ N/A
 程序解析命令行失败后，行为与直接运行时一致。
 
 *注意：程序不支持输入负数。*
+
+## 其他声明
+
++ 项目内容使用MIT许可证。
++ 项目的高精度部分（`bigint_dec.h`）来自 [Baobaobear/MiniBigInteger](https://github.com/Baobaobear/MiniBigInteger)，有改动（不涉及算法）；复制了其项目的许可证在 `bigint_dec.h` 开头。
