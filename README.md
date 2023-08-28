@@ -22,7 +22,7 @@ demo
 可以用`-d`设置数据：
 
 ```text
-test -d 2 3 1 0
+demo -d 2 3 1 0
 ```
 
 程序直接输出结果（对于以上数据，输出`(sqrt(0+1+3)+2)!`）。
@@ -32,7 +32,7 @@ test -d 2 3 1 0
 可以用`f`、`-s`和`-c`分别禁止阶乘、平方根和字符拼接：
 
 ```text
-test -d 2 3 1 0 -s
+demo -d 2 3 1 0 -s
 ```
 
 *Output:*
@@ -44,7 +44,7 @@ test -d 2 3 1 0 -s
 或者：
 
 ```text
-test -d 2 3 1 0 -s -f
+demo -d 2 3 1 0 -s -f
 ```
 
 *Output:*
@@ -56,7 +56,7 @@ test -d 2 3 1 0 -s -f
 如果找不到解，输出`N/A`。
 
 ```text
-test -d 2 3 1 0 -s -f -c
+demo -d 2 3 1 0 -s -f -c
 ```
 
 *Output:*
@@ -72,4 +72,4 @@ N/A
 ## 其他声明
 
 + 项目内容使用MIT许可证。
-+ 项目的高精度部分（`bigint_dec.h`）来自 [Baobaobear/MiniBigInteger](https://github.com/Baobaobear/MiniBigInteger)，有改动（不涉及算法）；复制了其项目的许可证在 `bigint_dec.h` 开头。
++ 项目的高精度部分（`bigint_dec.h`）来自 [Baobaobear/MiniBigInteger](https://github.com/Baobaobear/MiniBigInteger)，有改动（不涉及算法）；复制了其项目的许可证(MIT)在 `bigint_dec.h` 开头。
